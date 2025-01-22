@@ -36,7 +36,6 @@ const reminderSchema = new mongoose.Schema(
 
 reminderSchema.pre("save", function (next) {
   if (!this.reminderCode) {
-    // Generate a unique reminder code using timestamp and random string
     this.reminderCode = `REM-${Date.now()}-${Math.random()
       .toString(36)
       .substr(2, 5)
