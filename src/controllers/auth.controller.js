@@ -1,34 +1,28 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { check, validationResult } = require('express-validator');
-const path = require('path');
-const fs = require('fs');
-
-const User = require('../models/user.model');
-const { sendEmail, isValidEmail, saveFile } = require('../utilities/functions');
-
-const logger = require('../../lib/logger');
-const { IMGUPLOADPATHLive } = require('../utilities/constants');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { check, validationResult } = require("express-validator");
+const User = require("../models/user.model");
+const logger = require("../../lib/logger");
 const {
   getUserByUsername,
   getUserIdFromAuthorization,
   getUserFromAuthorization,
-} = require('../services/user.service');
+} = require("../services/user.service");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
 
-  await check('email').notEmpty().withMessage('Email is required').run(req);
-  await check('password')
+  await check("email").notEmpty().withMessage("Email is required").run(req);
+  await check("password")
     .notEmpty()
-    .withMessage('Password is required')
+    .withMessage("Password is required")
     .run(req);
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       status: false,
-      message: 'Please enter all required fields.',
+      message: "Please enter all required fields.",
       errors: errors.array(),
     });
   }
@@ -40,7 +34,7 @@ const login = async (req, res) => {
     }).lean();
 
     if (!user) {
-      return res.status(401).json({ status: false, message: 'User not found' });
+      return res.status(401).json({ status: false, message: "User not found" });
     }
 
     // Compare password
@@ -48,17 +42,17 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res
         .status(401)
-        .json({ status: false, message: 'Invalid Username or Password' });
+        .json({ status: false, message: "Invalid Username or Password" });
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '4h',
+      expiresIn: "4h",
     });
     let returnUserObj = user;
     delete returnUserObj.password;
     return res.status(200).json({
       status: true,
-      message: 'Logged In Successfully',
+      message: "Logged In Successfully",
       data: returnUserObj,
       token: token,
     });
@@ -74,35 +68,35 @@ const login = async (req, res) => {
 const register = async (req, res) => {
   const { name, email, password, birthdate } = req.body;
 
-  await check('name').notEmpty().withMessage('First name is required').run(req);
-  await check('email')
+  await check("name").notEmpty().withMessage("First name is required").run(req);
+  await check("email")
     .notEmpty()
-    .withMessage('Email is required')
+    .withMessage("Email is required")
     .isEmail()
-    .withMessage('Valid email is required')
+    .withMessage("Valid email is required")
     .run(req);
-  await check('password')
+  await check("password")
     .notEmpty()
-    .withMessage('Password is required')
+    .withMessage("Password is required")
     .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters')
+    .withMessage("Password must be at least 8 characters")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*(_|[^\w])).+$/)
     .withMessage(
-      'Password must include at least one lowercase letter, one uppercase letter, one number, and one special character'
+      "Password must include at least one lowercase letter, one uppercase letter, one number, and one special character"
     )
     .run(req);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       status: false,
-      message: 'Please enter all required fields.',
+      message: "Please enter all required fields.",
       errors: errors.array(),
     });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
   let username =
-    name.toLowerCase().replace(/\s+/g, '').substring(0, 8) +
+    name.toLowerCase().replace(/\s+/g, "").substring(0, 8) +
     Math.floor(Math.random() * 900) +
     100; // Generate username
 
@@ -112,7 +106,7 @@ const register = async (req, res) => {
     if (existingUserByEmail) {
       return res.status(400).json({
         status: false,
-        message: 'User with the same email already exists.',
+        message: "User with the same email already exists.",
       });
     }
 
@@ -135,7 +129,7 @@ const register = async (req, res) => {
 
     return res.status(201).json({
       status: true,
-      message: 'Account Created Successfully',
+      message: "Account Created Successfully",
     });
   } catch (error) {
     console.error(error);
@@ -149,17 +143,17 @@ const register = async (req, res) => {
 const updateProfile = async (req, res) => {
   const { name, email } = req.body;
   const file = req.file;
-  await check('name').notEmpty().withMessage('First Name is required').run(req);
-  await check('email')
+  await check("name").notEmpty().withMessage("First Name is required").run(req);
+  await check("email")
     .notEmpty()
-    .withMessage('Email password is required')
+    .withMessage("Email password is required")
     .run(req);
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       status: false,
-      message: 'Please enter all required fields.',
+      message: "Please enter all required fields.",
       errors: errors.array(),
     });
   }
@@ -170,16 +164,10 @@ const updateProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         status: false,
-        message: 'User not found.',
+        message: "User not found.",
       });
     }
     let profileData = req.body;
-    if (file) {
-      const fileSaved = await saveFile(file, '/profile');
-      if (fileSaved.status === 'success') {
-        profileData.photo = fileSaved.url;
-      }
-    }
     delete profileData.twoStepVerification;
     delete profileData.twoStepVerificationType;
     delete profileData.twoStepVerificationCode;
@@ -187,18 +175,18 @@ const updateProfile = async (req, res) => {
     delete profileData.twoStepVerificationCodeCount;
     const response = await User.findByIdAndUpdate(user?._id, profileData, {
       new: true,
-      select: '-password',
+      select: "-password",
     }).lean();
     if (!response) {
       return res.status(500).json({
         status: false,
-        message: 'Something went wrong.',
+        message: "Something went wrong.",
       });
     }
 
     return res.status(200).json({
       status: true,
-      message: 'Profile updated successfully.',
+      message: "Profile updated successfully.",
       data: response,
     });
   } catch (err) {
@@ -211,17 +199,17 @@ const updateProfile = async (req, res) => {
 };
 
 const updateUserProfile = async (req, res) => {
-  await check('name').notEmpty().withMessage('First Name is required').run(req);
-  await check('email')
+  await check("name").notEmpty().withMessage("First Name is required").run(req);
+  await check("email")
     .notEmpty()
-    .withMessage('Email password is required')
+    .withMessage("Email password is required")
     .run(req);
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       status: false,
-      message: 'Please enter all required fields.',
+      message: "Please enter all required fields.",
       errors: errors.array(),
     });
   }
@@ -235,30 +223,22 @@ const updateUserProfile = async (req, res) => {
     // Find the user by ID
     const executioner = await getUserFromAuthorization(req);
     let filters = { username: profileData?.username };
-    const user = await User.findOne(filters).select('-password').lean();
+    const user = await User.findOne(filters).select("-password").lean();
     if (!user) {
       return res.json({
         status: false,
-        message: 'User not found.',
+        message: "User not found.",
       });
-    }
-
-    if (file) {
-      const fileSaved = await saveFile(file, '/profile');
-      console.log(fileSaved);
-      if (fileSaved.status === 'success') {
-        profileData.photo = fileSaved.url;
-      }
     }
 
     const response2 = await User.findByIdAndUpdate(user?._id, profileData, {
       new: true,
-      select: '-password',
+      select: "-password",
     }).lean();
     if (!response2) {
       return res.json({
         status: false,
-        message: 'Something went wrong.',
+        message: "Something went wrong.",
       });
     }
     let response = await User.findById(response2?._id);
@@ -266,7 +246,7 @@ const updateUserProfile = async (req, res) => {
 
     return res.json({
       status: true,
-      message: 'Profile updated successfully.',
+      message: "Profile updated successfully.",
       data: response,
     });
   } catch (err) {
@@ -281,15 +261,15 @@ const updateUserProfile = async (req, res) => {
 const fetchProfile = async (req, res) => {
   try {
     const userId = await getUserIdFromAuthorization(req);
-    const user = await User.findById(userId).select('-password');
+    const user = await User.findById(userId).select("-password");
     if (!user) {
       return res
         .status(401)
-        .json({ status: false, message: 'User not found or inactive' });
+        .json({ status: false, message: "User not found or inactive" });
     }
     return res
       .status(200)
-      .json({ status: true, message: 'User found', data: user });
+      .json({ status: true, message: "User found", data: user });
   } catch (error) {
     console.error(error);
     return res.status(500).json({

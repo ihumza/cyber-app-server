@@ -1,16 +1,16 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const secret = process.env.JWT_SECRET;
-const User = require('../models/user.model');
+const User = require("../models/user.model");
 
 const getUserFromAuthorization = async (req) => {
   try {
-    const accessToken = req.headers['authorization']?.split(' ')[1];
+    const accessToken = req.headers["authorization"]?.split(" ")[1];
     if (!accessToken) {
       return null;
     }
     const decodedToken = jwt.verify(accessToken, secret);
     const userId = decodedToken.id;
-    const user = await User.findById(userId).populate('role');
+    const user = await User.findById(userId);
 
     return user;
   } catch (error) {
@@ -20,7 +20,7 @@ const getUserFromAuthorization = async (req) => {
 
 const getUserIdFromAuthorization = async (req) => {
   try {
-    const accessToken = req.headers['authorization']?.split(' ')[1];
+    const accessToken = req.headers["authorization"]?.split(" ")[1];
     if (!accessToken) {
       return null;
     }

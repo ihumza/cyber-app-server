@@ -21,7 +21,7 @@ const sanitize = (req, res, next) => {
     }
     next();
   } catch (error) {
-    return res.status(500).json({ status: "fail", message: error.message });
+    return res.status(500).json({ status: false, message: error.message });
   }
 };
 

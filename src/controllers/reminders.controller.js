@@ -1,38 +1,33 @@
 const bcrypt = require("bcrypt");
 const { check, validationResult } = require("express-validator");
 const { sanitizeString } = require("../utilities/functions");
-const User = require("../models/user.model");
+const Reminder = require("../models/reminders.model");
 
-const listUsers = async (req, res) => {
+const listReminders = async (req, res) => {
   const { query, offset, limit } = req.query;
   try {
     let filters = {};
     if (query && query.trim() !== "") {
-      filters.$or = [
-        { username: { $regex: query.trim(), $options: "i" } },
-        { name: { $regex: query.trim(), $options: "i" } },
-        { email: { $regex: query.trim(), $options: "i" } },
-      ];
+      filters.$or = [{ email: { $regex: query.trim(), $options: "i" } }];
     }
 
-    const users = await User.find(filters)
+    const reminders = await Reminder.find(filters)
       .sort({ createdAt: -1 })
       .skip(offset)
-      .limit(limit)
-      .select("-password");
+      .limit(limit);
 
-    if (users.length > 0) {
+    if (reminders.length > 0) {
       const response = {
         status: true,
-        message: "User List Found",
-        data: users,
-        count: await User.countDocuments(filters),
+        message: "Reminder List Found",
+        data: reminders,
+        count: await Reminder.countDocuments(filters),
       };
       return res.status(200).json(response);
     } else {
       return res
         .status(404)
-        .json({ status: false, message: "No User List Found!" });
+        .json({ status: false, message: "No Reminder List Found!" });
     }
   } catch (error) {
     console.error(error);
@@ -43,51 +38,11 @@ const listUsers = async (req, res) => {
   }
 };
 
-const getUserByUsername = async (req, res) => {
-  const { username } = req.params;
-  try {
-    let filters = { username: username };
-    const user = await User.findOne(filters).select("-password").lean();
-
-    if (user) {
-      const response = {
-        status: true,
-        message: "User Found",
-        data: user,
-      };
-      return res.status(200).json(response);
-    } else {
-      return res.status(404).json({ status: false, message: "No User Found!" });
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      status: false,
-      message: "Database Connection Error. Contact Webmaster!",
-    });
-  }
-};
-
-const addUser = async (req, res) => {
+const addReminder = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    await check("name").notEmpty().withMessage("Name is required").run(req);
-    await check("password")
-      .notEmpty()
-      .withMessage("Password is required")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters")
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*(_|[^\w])).+$/)
-      .withMessage(
-        "Password must include at least one lowercase letter, one uppercase letter, one number, and one special character"
-      )
-      .run(req);
-    await check("email")
-      .isEmail()
-      .withMessage("Valid email is required")
-      .run(req);
-
+    await check("event").notEmpty().withMessage("Event is required").run(req);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -96,39 +51,17 @@ const addUser = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    let username =
-      name.toLowerCase().replace(/\s+/g, "").substring(0, 8) +
-      Math.floor(Math.random() * 900) +
-      100;
-
-    let existingUser = await User.findOne({
-      username: { $regex: username, $options: "i" },
-    });
-    if (existingUser) {
-      username += existingUser.length;
-    }
-
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(400).json({
-        status: false,
-        message: "User With Same Email is Already Added",
-      });
-    }
-
     let payload = {
       name,
       username,
-      password: hashedPassword,
     };
 
-    const newUser = new User(payload);
-    await newUser.save();
+    const newReminder = new Reminder(payload);
+    await newReminder.save();
 
     return res.status(201).json({
       status: true,
-      message: "User Added",
+      message: "Reminder Added",
     });
   } catch (error) {
     console.error(error);
@@ -168,18 +101,18 @@ const editProfile = async (req, res) => {
     const sanitizedName = sanitizeString(name);
     const sanitizedEmail = sanitizeString(email);
 
-    const duplicateEmailUser = await User.findOne({
+    const duplicateEmailReminder = await Reminder.findOne({
       email: sanitizedEmail,
       _id: { $ne: userId },
     });
-    if (duplicateEmailUser) {
+    if (duplicateEmailReminder) {
       return res.status(409).json({
         status: false,
-        message: "User with the same email already exists.",
+        message: "Reminder with the same email already exists.",
       });
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedReminder = await Reminder.findByIdAndUpdate(
       userId,
       {
         name: sanitizedName,
@@ -188,7 +121,7 @@ const editProfile = async (req, res) => {
       { new: true }
     );
 
-    if (!updatedUser) {
+    if (!updatedReminder) {
       return res.status(500).json({
         status: false,
         message: "Failed to update your profile.",
@@ -208,7 +141,7 @@ const editProfile = async (req, res) => {
   }
 };
 
-const editUser = async (req, res) => {
+const editReminder = async (req, res) => {
   const { username, _id, name, email } = req.body;
 
   try {
@@ -220,27 +153,27 @@ const editUser = async (req, res) => {
     if (Object.keys(filters).length === 0) {
       return res.status(400).json({
         status: false,
-        message: "No valid identifier provided to locate the user.",
+        message: "No valid identifier provided to identify the reminder.",
       });
     }
 
-    const updatedUser = await User.findOneAndUpdate(
+    const updatedReminder = await Reminder.findOneAndUpdate(
       filters,
       { ...req.body },
       { new: true }
     ).select("-password");
 
-    if (!updatedUser) {
+    if (!updatedReminder) {
       return res.status(404).json({
         status: false,
-        message: "User not found.",
+        message: "Reminder not found.",
       });
     }
 
     return res.status(200).json({
       status: true,
-      message: "User Updated",
-      user: updatedUser,
+      message: "Reminder Updated",
+      data: updatedReminder,
     });
   } catch (error) {
     console.error(error);
@@ -251,23 +184,23 @@ const editUser = async (req, res) => {
   }
 };
 
-const deleteUser = async (req, res) => {
+const deleteReminder = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const deletedUser = await User.findByIdAndUpdate(id, {
+    const deletedReminder = await Reminder.findByIdAndUpdate(id, {
       deleted: true,
     });
-    if (!deletedUser) {
+    if (!deletedReminder) {
       return res.status(404).json({
         status: false,
-        message: "User Not Found",
+        message: "Reminder Not Found",
       });
     }
 
     return res.status(200).json({
       status: true,
-      message: "User Deleted",
+      message: "Reminder Deleted",
     });
   } catch (error) {
     console.error(error);
@@ -279,10 +212,9 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
-  listUsers,
-  addUser,
+  listReminders,
+  addReminder,
   editProfile,
-  editUser,
-  deleteUser,
-  getUserByUsername,
+  editReminder,
+  deleteReminder,
 };

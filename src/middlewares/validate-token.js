@@ -18,7 +18,7 @@ const validateToken = async (req, res, next) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
   } catch (error) {
-    return res.status(401).json({ status: "fail", message: error.message });
+    return res.status(401).json({ status: false, message: error.message });
   }
 };
 
